@@ -16,6 +16,9 @@ var product = new mongoose.Schema({
     },
     Prate: {
         type: Number
+    },
+    Pimg: {
+        type: String
     }
 
 })
