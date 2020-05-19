@@ -65,22 +65,22 @@ app.get("/", (req, res) => {
     res.end();
 });
 app.get("/media/:imgname", (req, res) => {
-    fs.readFile('./media/'+req.params.imgname, function (err, data) {
-        if(err){
-            console.log("Error",err)
+    fs.readFile('./media/' + req.params.imgname, function (err, data) {
+        if (err) {
+            console.log("Error", err)
             res.json("No data found")
             return;
-            
-           }
-           if(data){            
-            res.writeHead(200,{'Content-type':'image/jpeg'});
+
+        }
+        if (data) {
+            res.writeHead(200, { 'Content-type': 'image/jpeg' });
             res.write(data)
             res.end()
-           }
-           if(!data){
-               console.log("file","File dp is not found")                
-               res.end("File dp is not found")
-              }
+        }
+        if (!data) {
+            console.log("file", "File dp is not found")
+            res.end("File dp is not found")
+        }
     })
 })
 app.post("/reg", (req, res) => {
@@ -175,21 +175,30 @@ app.post("/addproduct", upload.single('file'), (req, res) => {
         res.end();
     })
 })
-app.put("/updproduct/:pid", (req, res) => {
-    prod_sch.findOneAndUpdate({ "Pid": req.params.pid }, { "Pname": req.body.pname, "Pqty": req.body.pqty, "Prate": req.body.prate }).then(result => {
-        if (!result || result.lengh == 0) {
-            res.json({ "status": false, "msg": "No data found" });
+app.put("/updproduct/:pid", upload.single('file'), (req, res) => {
+    let myarray = [];
+    myarray.push(JSON.parse(req.body.pdata));
+    prod_sch.findOneAndUpdate(
+        { "Pid": req.params.pid },
+        {
+            "Pname": myarray[0].pname,
+            "Pqty": myarray[0].pqty,
+            "Prate": myarray[0].prate,
+            "Pimg": (myarray[0].pname).substring(0, 3) + req.file.originalname
+        }).then(result => {
+            if (!result || result.lengh == 0) {
+                res.json({ "status": false, "msg": "No data found" });
+                res.end();
+            }
+            if (result) {
+                res.json({ "status": true, "Msg": "Updated successfully" });
+                res.end();
+            }
+        }).catch(e => {
+            console.log(e)
+            res.json({ "status": false, "Error": e });
             res.end();
-        }
-        if (result) {
-            res.json({ "status": true, "Msg": "Updated successfully" });
-            res.end();
-        }
-    }).catch(e => {
-        console.log(e)
-        res.json({ "status": false, "Error": e });
-        res.end();
-    })
+        })
 })
 
 app.delete("/delproduct/:pid", (req, res) => {
