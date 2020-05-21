@@ -16,6 +16,7 @@ app.use(function (req, res, next) {
 });
 var user_sch = require('./schema/User_schema.js');
 var prod_sch = require('./schema/Product_schema.js');
+var order_sch = require('./schema/order_schema.js');
 var fs = require("fs")
 const dotenv = require('dotenv');
 dotenv.config();
@@ -156,9 +157,10 @@ app.get("/allproduct", (req, res) => {
 
 app.post("/addproduct", upload.single('file'), (req, res) => {
     let myarray = [];
+    console.log(JSON.parse(req.body.pdata))
     myarray.push(JSON.parse(req.body.pdata));
     add_prod = new prod_sch({
-        Pid: (myarray[0].pname).substring(0, 3) + Date.now(),
+        Pid: (myarray[0].pname).substring(0, 3) + Math.random().toString(36).substr(2, 9),
         Pname: myarray[0].pname,
         Pdate: Date.now(),
         Pqty: myarray[0].pqty,
@@ -201,6 +203,54 @@ app.put("/updproduct/:pid", upload.single('file'), (req, res) => {
         })
 })
 
+app.put("/orderproduct/:pid", (req, res) => {
+    // console.log(req.body, "body")
+    // console.log(req.params.pid, "parmas");
+    prod_sch.findOne({ Pid: req.params.pid }).then(result => {
+        if (!result || result.lengh == 0) {
+            res.json({ "status": false, "msg": "No data found" });
+            res.end();
+        }
+        if (result) {
+            // console.log(result, "result one");
+            // console.log(result.Pqty, "result one 2");
+            var exsqty = result.Pqty
+            var ordqty = req.body.getqty
+            var subqty = exsqty - ordqty;
+            prod_sch.findOneAndUpdate(
+                { "Pid": req.params.pid },
+                { "Pqty": subqty }).
+                then(resultdata => {
+                    // console.log(result, "Finaly output")
+                    if (resultdata) {
+                        user_order = new order_sch({
+                            Pid: req.params.pid,
+                            Pname: result.Pname,
+                            Pqty: req.body.getqty,
+                            Prate: result.Prate,
+                            Userid: req.body.userid,
+                            Pimg: result.Pimg,
+                            Orderdate: Date.now()
+                        });
+
+                        user_order.save().then(fresult => {
+                            res.json({ "status": true, "msg": "Record added to cart Success" });
+                            res.end();
+                        }).catch(e => {
+                            console.log("order error", e)
+                            res.json({ "status": false, "msg": "Record order UnSuccess", "Error": e });
+                            res.end();
+                        })
+
+                    }
+                }).catch(e => {
+                    console.log("product update error", e)
+                    res.json({ "status": false, "Error": e });
+                    res.end();
+                })
+        }
+    })
+})
 app.delete("/delproduct/:pid", (req, res) => {
     prod_sch.findOneAndDelete({ "Pid": req.params.pid }).then(result => {
         if (!result || result.lengh == 0) {
@@ -217,7 +267,66 @@ app.delete("/delproduct/:pid", (req, res) => {
         res.end();
     })
 })
-
+app.post("/orderproduct/", (req, res) => {
+    console.log(req.body)
+    order_sch.find({ Userid: req.body.userid })
+        .then(result => {
+            if (!result || result.lengh == 0) {
+                res.json({ "status": false, "msg": "No data found" });
+                res.end();
+            }
+            if (result) {
+                res.json({ "status": true, "Data": result });
+                res.end();
+            }
+        }).catch(e => {
+            console.log(e)
+            res.json({ "status": false, "Error": e });
+            res.end();
+        })
+})
+app.put("/cancelorder/", (req, res) => {
+    // console.log(req.body)
+    var add=0;
+    prod_sch.findOne({ Pid: req.body.pid }).then(fresult => {
+        if (!fresult || fresult.lengh == 0) {
+            res.json({ "status": false, "msg": "No data found" });
+            res.end();
+        }
+        if (fresult) {
+            // // console.log(fresult,"findone")
+            // var frst = ;
+            // // console.log(frst)
+            // var canprd = ;
+            // // console.log(canprd)
+            add = Number(fresult.Pqty) + Number(req.body.pqty);
+            console.log(add)
+            prod_sch.findOneAndUpdate(
+                { "Pid": req.body.pid },
+                { "Pqty": add })
+                .then(result => {
+                    console.log(result, "second")
+                    if (!result || result.lengh == 0) {
+                        res.json({ "status": false, "msg": "No data found" });
+                        res.end();
+                    }
+                    if (result) {
+                        console.log("Userid" + req.body.userid, "final")
+                        order_sch.findOneAndDelete({ Userid: req.body.userid }, (err, data) => {                            
+                            if (data) {
+                                res.json({ "status": true, "Msg": "cancellation successfully" });
+                                // res.end();
+                            }
+                        })                       
+                    }
+                }).catch(e => {
+                    console.log(e)
+                    res.json({ "status": false, "Error": e });
+                    res.end();
+                })
+        }
+    })
+})
 var port = process.env.PORT || 3000;
 app.listen(port, (err) => {
     if (!err) {
